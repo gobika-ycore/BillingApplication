@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "886497979459",
+    "project_id": "biilingapp-3cc76",
+    "storage_bucket": "biilingapp-3cc76.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:886497979459:android:602ca4a20d95c996d038f6",
+        "android_client_info": {
+          "package_name": "com.billingapp5"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3G5VA6Wvr6qf7N5OPDgIKc9IorBOXfbg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
