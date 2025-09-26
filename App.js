@@ -16,6 +16,7 @@ import SettingsScreen from "./screens/SettingsScreen";
 import CustomerDataScreen from "./screens/CustomerDataScreen";
 import SalesBillScreen from "./screens/SalesBillScreen";
 import CollectionBillScreen from "./screens/CollectionBillScreen";
+import LoanSalesScreen from "./screens/LoanSalesScreen";
 
 const Stack = createStackNavigator();
 
@@ -116,6 +117,17 @@ export default function App() {
         <Stack.Screen name="CustomerData" component={CustomerDataScreen} />
         <Stack.Screen name="SalesBill" component={SalesBillScreen} />
         <Stack.Screen name="CollectionBill" component={CollectionBillScreen} />
+        <Stack.Screen 
+          name="LoanSales" 
+          component={LoanSalesScreen} 
+          options={{
+            headerShown: true,
+            headerStyle: { backgroundColor: "#1F49B6" },
+            headerTintColor: "#fff",
+            headerTitleStyle: { fontWeight: "bold" },
+            title: "Loan Sales"
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

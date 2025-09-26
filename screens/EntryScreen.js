@@ -46,7 +46,18 @@ const EntryScreen = ({ navigation }) => {
         <Text style={styles.sectionHeader}>Sales</Text>
         <View style={styles.cardGroup}>
           {entryOptions.Sales.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.card}>
+            <TouchableOpacity 
+              key={item.id} 
+              style={styles.card}
+              onPress={() => {
+                if (item.title === 'Loan Sales') {
+                  navigation.navigate('LoanSales');
+                } else {
+                  // Handle other sales options here
+                  alert(`${item.title} will be implemented soon`);
+                }
+              }}
+            >
               <Text style={styles.cardText}>{item.title}</Text>
             </TouchableOpacity>
           ))}
