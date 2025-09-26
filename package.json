@@ -8,7 +8,10 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "clean-build": "node scripts/clean-and-build.js",
+    "clean-conflicts": "node scripts/clean-merge-conflicts.js",
+    "push-github": "node scripts/push-to-github.js"
   },
   "dependencies": {
     "@react-native-firebase/app": "^18.6.1",

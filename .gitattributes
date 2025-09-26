@@ -1,0 +1,19 @@
+# Set JavaScript as the primary language
+*.js linguist-language=JavaScript
+*.jsx linguist-language=JavaScript
+
+# Exclude certain files from language detection
+*.bat linguist-detectable=false
+*.ps1 linguist-detectable=false
+*.swift linguist-detectable=false
+android/gradlew.bat linguist-detectable=false
+node_modules/* linguist-vendored
+backend/node_modules/* linguist-vendored
+
+# Mark documentation files
+*.md linguist-documentation
+
+# Mark configuration files
+*.json linguist-language=JSON
+*.xml linguist-language=XML
+*.gradle linguist-language=Gradle
