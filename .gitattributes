@@ -6,7 +6,12 @@
 *.bat linguist-detectable=false
 *.ps1 linguist-detectable=false
 *.swift linguist-detectable=false
+*.kt linguist-detectable=false
+*.rb linguist-detectable=false
 android/gradlew.bat linguist-detectable=false
+ios/BillingApp5/AppDelegate.swift linguist-detectable=false
+Gemfile linguist-detectable=false
+Podfile linguist-detectable=false
 node_modules/* linguist-vendored
 backend/node_modules/* linguist-vendored
 
