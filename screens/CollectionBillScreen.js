@@ -15,9 +15,12 @@ import firestore from '@react-native-firebase/firestore';
 
 const CollectionBillScreen = ({ navigation }) => {
   const [showForm, setShowForm] = useState(false);
+  const [editingBill, setEditingBill] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [collectionBills, setCollectionBills] = useState([]);
+  const [filteredCollectionBills, setFilteredCollectionBills] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     date: "",
     billNo: "",
@@ -38,6 +41,7 @@ const CollectionBillScreen = ({ navigation }) => {
         ...doc.data()
       }));
       setCollectionBills(billsList);
+      setFilteredCollectionBills(billsList);
     } catch (error) {
       console.error('Error loading collection bills:', error);
       Alert.alert('Error', 'Failed to load collection bills. Please try again.');
@@ -46,10 +50,46 @@ const CollectionBillScreen = ({ navigation }) => {
     }
   }, []);
 
+  // Auto-fill date, bill number, and receipt number
+  const generateBillNumber = useCallback(() => {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+    const timeStr = today.getTime().toString().slice(-4);
+    return `BILL${timeStr}`;
+  }, []);
+
+  const generateReceiptNumber = useCallback(() => {
+    const today = new Date();
+    const timeStr = today.getTime().toString().slice(-4);
+    return `REC${timeStr}`;
+  }, []);
+
+  const autoFillDefaults = useCallback(() => {
+    if (!editingBill) {
+      const today = new Date().toISOString().split('T')[0];
+      const billNo = generateBillNumber();
+      const receiptNo = generateReceiptNumber();
+      
+      setFormData(prev => ({
+        ...prev,
+        date: prev.date || today,
+        billNo: prev.billNo || billNo,
+        receiptNo: prev.receiptNo || receiptNo,
+      }));
+    }
+  }, [generateBillNumber, generateReceiptNumber, editingBill]);
+
   // Load collection bills when component mounts
   useEffect(() => {
     loadCollectionBills();
   }, [loadCollectionBills]);
+
+  // Auto-fill defaults when form is opened for new bill
+  useEffect(() => {
+    if (showForm && !editingBill) {
+      autoFillDefaults();
+    }
+  }, [showForm, editingBill, autoFillDefaults]);
 
 
   const handleInputChange = useCallback((field, value) => {
@@ -80,6 +120,34 @@ const CollectionBillScreen = ({ navigation }) => {
     
     return errors;
   };
+
+  // Search functionality
+  const handleSearch = useCallback((query) => {
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setFilteredCollectionBills(collectionBills);
+      return;
+    }
+
+    const filtered = collectionBills.filter(bill => {
+      const searchTerm = query.toLowerCase();
+      return (
+        bill.date?.toLowerCase().includes(searchTerm) ||
+        bill.billNo?.toLowerCase().includes(searchTerm) ||
+        bill.acNo?.toLowerCase().includes(searchTerm) ||
+        bill.customerName?.toLowerCase().includes(searchTerm) ||
+        bill.receiptNo?.toLowerCase().includes(searchTerm) ||
+        bill.collectionAmount?.toString().includes(searchTerm) ||
+        bill.paymentMethod?.toLowerCase().includes(searchTerm)
+      );
+    });
+    setFilteredCollectionBills(filtered);
+  }, [collectionBills]);
+
+  // Update filtered bills when collection bills list changes
+  useEffect(() => {
+    handleSearch(searchQuery);
+  }, [collectionBills, handleSearch, searchQuery]);
 
   const resetForm = () => {
     setFormData({
@@ -119,17 +187,26 @@ const CollectionBillScreen = ({ navigation }) => {
         updatedAt: firestore.FieldValue.serverTimestamp()
       };
 
-      // Save to Firestore
-      await firestore().collection('collectionBills').add(billData);
+      if (editingBill) {
+        // Update existing bill
+        await firestore().collection('collectionBills').doc(editingBill.id).update({
+          ...billData,
+          updatedAt: firestore.FieldValue.serverTimestamp()
+        });
+      } else {
+        // Save new bill to Firestore
+        await firestore().collection('collectionBills').add(billData);
+      }
       
       Alert.alert(
         "Success!", 
-        `Collection bill "${billNo}" has been saved successfully!\nCustomer: ${formData.customerName}\nAmount: ₹${formData.collectionAmount}`,
+        `Collection bill "${billNo}" has been ${editingBill ? 'updated' : 'saved'} successfully!\nCustomer: ${formData.customerName}\nAmount: ₹${formData.collectionAmount}`,
         [
           {
             text: "OK",
             onPress: () => {
               setShowForm(false);
+              setEditingBill(null);
               resetForm();
               loadCollectionBills(); // Refresh the bills list
             }
@@ -146,30 +223,56 @@ const CollectionBillScreen = ({ navigation }) => {
   };
 
   const handleAddNew = () => {
+    setEditingBill(null);
+    resetForm();
+    setShowForm(true);
+  };
+
+  const handleEdit = (bill) => {
+    setEditingBill(bill);
+    setFormData({
+      date: bill.date || '',
+      billNo: bill.billNo || '',
+      acNo: bill.acNo || '',
+      customerName: bill.customerName || '',
+      receiptNo: bill.receiptNo || '',
+      collectionAmount: bill.collectionAmount?.toString() || '',
+      paymentMethod: bill.paymentMethod || '',
+    });
     setShowForm(true);
   };
 
   const handleCancel = () => {
     setShowForm(false);
+    setEditingBill(null);
     resetForm();
   };
-
   const FormField = ({ label, field, placeholder, multiline = false }) => (
     <View style={styles.fieldContainer}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
-        style={[styles.input, multiline && styles.multilineInput]}
+        style={[
+          styles.input, 
+          multiline && styles.multilineInput,
+          { color: '#000000' }
+        ]}
         placeholder={placeholder}
         value={formData[field]}
-        onChangeText={(value) => handleInputChange(field, value)}
+        onChangeText={(text) => handleInputChange(field, text)}
         multiline={multiline}
         numberOfLines={multiline ? 3 : 1}
+        placeholderTextColor="#999"
+        selectionColor="#1F49B6"
       />
     </View>
   );
 
   const renderCollectionBillItem = ({ item }) => (
-    <View style={styles.collectionCard}>
+    <TouchableOpacity 
+      style={styles.collectionCard}
+      onPress={() => handleEdit(item)}
+      activeOpacity={0.7}
+    >
       <View style={styles.collectionHeader}>
         <Text style={styles.billNo}>{item.billNo}</Text>
         <Text style={styles.date}>{item.date}</Text>
@@ -178,9 +281,13 @@ const CollectionBillScreen = ({ navigation }) => {
       <Text style={styles.acNo}>{item.acNo}</Text>
       <View style={styles.collectionFooter}>
         <Text style={styles.receiptNo}>{item.receiptNo}</Text>
-        <Text style={styles.collectionAmount}>{item.collectionAmount}</Text>
+        <Text style={styles.collectionAmount}>₹{item.collectionAmount}</Text>
       </View>
-    </View>
+      <View style={styles.editIndicator}>
+        <Icon name="create-outline" size={16} color="#1E40AF" />
+        <Text style={styles.editText}>Tap to edit</Text>
+      </View>
+    </TouchableOpacity>
   );
 
   if (showForm) {
@@ -194,7 +301,7 @@ const CollectionBillScreen = ({ navigation }) => {
           >
             <Icon name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add New Collection Bill</Text>
+          <Text style={styles.headerTitle}>{editingBill ? 'Edit Collection Bill' : 'Add New Collection Bill'}</Text>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Icon name="checkmark" size={24} color="#fff" />
           </TouchableOpacity>
@@ -250,7 +357,7 @@ const CollectionBillScreen = ({ navigation }) => {
                 <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>Saving...</Text>
               </View>
             ) : (
-              <Text style={styles.submitButtonText}>Save Collection Bill</Text>
+              <Text style={styles.submitButtonText}>{editingBill ? 'Update Collection Bill' : 'Save Collection Bill'}</Text>
             )}
           </TouchableOpacity>
 
@@ -278,21 +385,47 @@ const CollectionBillScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by date, bill no, account no, customer name, receipt no, amount, payment method..."
+            value={searchQuery}
+            onChangeText={handleSearch}
+            placeholderTextColor="#999"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => handleSearch('')}
+              style={styles.clearButton}
+            >
+              <Icon name="close-circle" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       {/* Collection Bill List */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1F49B6" />
           <Text style={styles.loadingText}>Loading collection bills...</Text>
         </View>
-      ) : collectionBills.length === 0 ? (
+      ) : filteredCollectionBills.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Icon name="receipt-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>No collection bills found</Text>
-          <Text style={styles.emptySubText}>Tap the button below to add your first collection bill</Text>
+          <Text style={styles.emptyText}>
+            {searchQuery ? 'No collection bills found matching your search' : 'No collection bills found'}
+          </Text>
+          <Text style={styles.emptySubText}>
+            {searchQuery ? 'Try adjusting your search terms' : 'Tap the button below to add your first collection bill'}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={collectionBills}
+          data={filteredCollectionBills}
           renderItem={renderCollectionBillItem}
           keyExtractor={(item) => item.id}
           style={styles.content}
@@ -496,6 +629,52 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: "#ccc",
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#f8f9fa",
+  },
+  searchInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+    paddingVertical: 0,
+  },
+  clearButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  editIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  editText: {
+    fontSize: 12,
+    color: '#1E40AF',
+    marginLeft: 4,
+    fontStyle: 'italic',
   },
 });
 

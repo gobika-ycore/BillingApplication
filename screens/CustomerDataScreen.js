@@ -42,6 +42,7 @@ const FormField = React.memo(({ label, field, placeholder, multiline = false, va
           shadowRadius: 2,
           minHeight: 48,
           textAlignVertical: multiline ? "top" : "center",
+          color: "#000000",
         },
         multiline && {
           height: 80,
@@ -51,7 +52,6 @@ const FormField = React.memo(({ label, field, placeholder, multiline = false, va
       placeholder={placeholder}
       value={value}
       onChangeText={onChangeText}
-      multiline={multiline}
       numberOfLines={multiline ? 3 : 1}
       autoCorrect={false}
       autoCapitalize="sentences"
@@ -65,9 +65,12 @@ const FormField = React.memo(({ label, field, placeholder, multiline = false, va
 
 const CustomerDataScreen = ({ navigation }) => {
   const [showForm, setShowForm] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState([]);
+  const [filteredCustomers, setFilteredCustomers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     acNo: "",
     customerGroup: "",
@@ -76,6 +79,7 @@ const CustomerDataScreen = ({ navigation }) => {
     phone: "",
     address: "",
     loanLimit: "",
+    loanType: "",
     idProof: "",
     customerPhoto: "",
     location: "",
@@ -91,6 +95,7 @@ const CustomerDataScreen = ({ navigation }) => {
         ...doc.data()
       }));
       setCustomers(customerList);
+      setFilteredCustomers(customerList);
     } catch (error) {
       console.error('Error loading customers:', error);
       Alert.alert('Error', 'Failed to load customers. Please try again.');
@@ -158,17 +163,26 @@ const CustomerDataScreen = ({ navigation }) => {
         isActive: true
       };
 
-      // Save to Firestore
-      const docRef = await firestore().collection('customers').add(customerData);
+      if (editingCustomer) {
+        // Update existing customer
+        await firestore().collection('customers').doc(editingCustomer.id).update({
+          ...customerData,
+          updatedAt: firestore.FieldValue.serverTimestamp()
+        });
+      } else {
+        // Save new customer to Firestore
+        await firestore().collection('customers').add(customerData);
+      }
       
       Alert.alert(
         "Success!", 
-        `Customer "${formData.name}" has been saved successfully!\nAccount No: ${acNo}`,
+        `Customer "${formData.name}" has been ${editingCustomer ? 'updated' : 'saved'} successfully!\nAccount No: ${acNo}`,
         [
           {
             text: "OK",
             onPress: () => {
               setShowForm(false);
+              setEditingCustomer(null);
               resetForm();
               loadCustomers(); // Refresh the customer list
             }
@@ -184,6 +198,35 @@ const CustomerDataScreen = ({ navigation }) => {
     }
   };
 
+  // Search functionality
+  const handleSearch = useCallback((query) => {
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setFilteredCustomers(customers);
+      return;
+    }
+
+    const filtered = customers.filter(customer => {
+      const searchTerm = query.toLowerCase();
+      return (
+        customer.acNo?.toLowerCase().includes(searchTerm) ||
+        customer.customerGroup?.toLowerCase().includes(searchTerm) ||
+        customer.area?.toLowerCase().includes(searchTerm) ||
+        customer.name?.toLowerCase().includes(searchTerm) ||
+        customer.phone?.toLowerCase().includes(searchTerm) ||
+        customer.address?.toLowerCase().includes(searchTerm) ||
+        customer.loanLimit?.toString().includes(searchTerm) ||
+        customer.location?.toLowerCase().includes(searchTerm)
+      );
+    });
+    setFilteredCustomers(filtered);
+  }, [customers]);
+
+  // Update filtered customers when customers list changes
+  useEffect(() => {
+    handleSearch(searchQuery);
+  }, [customers, handleSearch, searchQuery]);
+
   const resetForm = () => {
     setFormData({
       acNo: "",
@@ -193,6 +236,7 @@ const CustomerDataScreen = ({ navigation }) => {
       phone: "",
       address: "",
       loanLimit: "",
+      loanType: "",
       idProof: "",
       customerPhoto: "",
       location: "",
@@ -200,28 +244,62 @@ const CustomerDataScreen = ({ navigation }) => {
   };
 
   const handleAddNew = () => {
+    setEditingCustomer(null);
+    resetForm();
+    setShowForm(true);
+  };
+
+  const handleEdit = (customer) => {
+    setEditingCustomer(customer);
+    setFormData({
+      acNo: customer.acNo || '',
+      customerGroup: customer.customerGroup || '',
+      area: customer.area || '',
+      name: customer.name || '',
+      phone: customer.phone || '',
+      address: customer.address || '',
+      loanLimit: customer.loanLimit?.toString() || '',
+      loanType: customer.loanType || '',
+      idProof: customer.idProof || '',
+      customerPhoto: customer.customerPhoto || '',
+      location: customer.location || '',
+    });
     setShowForm(true);
   };
 
   const handleCancel = () => {
     setShowForm(false);
+    setEditingCustomer(null);
     resetForm();
   };
 
 
   const renderCustomerItem = ({ item }) => (
-    <View style={styles.customerCard}>
+    <TouchableOpacity 
+      style={styles.customerCard}
+      onPress={() => handleEdit(item)}
+      activeOpacity={0.7}
+    >
       <View style={styles.customerHeader}>
         <Text style={styles.customerName}>{item.name}</Text>
         <Text style={styles.customerAcNo}>{item.acNo}</Text>
       </View>
       <Text style={styles.customerPhone}>{item.phone}</Text>
       <Text style={styles.customerArea}>{item.area}</Text>
+      {item.loanType && (
+        <View style={styles.loanTypeContainer}>
+          <Text style={styles.loanTypeText}>{item.loanType}</Text>
+        </View>
+      )}
       <View style={styles.customerFooter}>
         <Text style={styles.customerGroup}>{item.customerGroup}</Text>
-        <Text style={styles.customerLimit}>{item.loanLimit}</Text>
+        <Text style={styles.customerLimit}>₹{item.loanLimit}</Text>
       </View>
-    </View>
+      <View style={styles.editIndicator}>
+        <Icon name="create-outline" size={16} color="#1E40AF" />
+        <Text style={styles.editText}>Tap to edit</Text>
+      </View>
+    </TouchableOpacity>
   );
 
   if (showForm) {
@@ -235,7 +313,7 @@ const CustomerDataScreen = ({ navigation }) => {
           >
             <Icon name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add New Customer</Text>
+          <Text style={styles.headerTitle}>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</Text>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Icon name="checkmark" size={24} color="#fff" />
           </TouchableOpacity>
@@ -300,6 +378,46 @@ const CustomerDataScreen = ({ navigation }) => {
             onChangeText={(value) => handleInputChange('loanLimit', value)}
           />
           
+          <View style={{
+            marginBottom: 20,
+          }}>
+            <Text style={{
+              fontSize: 16,
+              fontWeight: "600",
+              color: "#333",
+              marginBottom: 8,
+              lineHeight: 24,
+            }}>Loan Type</Text>
+            <View style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 10,
+            }}>
+              {['Personal Loan', 'Business Loan', 'Home Loan', 'Vehicle Loan', 'Education Loan', 'Gold Loan'].map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={{
+                    paddingHorizontal: 15,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: formData.loanType === type ? '#1F49B6' : '#ddd',
+                    backgroundColor: formData.loanType === type ? '#1F49B6' : '#fff',
+                  }}
+                  onPress={() => handleInputChange('loanType', type)}
+                >
+                  <Text style={{
+                    fontSize: 14,
+                    color: formData.loanType === type ? '#fff' : '#666',
+                    fontWeight: formData.loanType === type ? '600' : 'normal',
+                  }}>
+                    {type}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          
           <FormField 
             label="Id proof" 
             field="idProof" 
@@ -361,7 +479,7 @@ const CustomerDataScreen = ({ navigation }) => {
                 <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>Saving...</Text>
               </View>
             ) : (
-              <Text style={styles.submitButtonText}>Save Customer Data</Text>
+              <Text style={styles.submitButtonText}>{editingCustomer ? 'Update Customer Data' : 'Save Customer Data'}</Text>
             )}
           </TouchableOpacity>
 
@@ -389,21 +507,47 @@ const CustomerDataScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by account no, name, phone, area, group, address, loan limit, location..."
+            value={searchQuery}
+            onChangeText={handleSearch}
+            placeholderTextColor="#999"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => handleSearch('')}
+              style={styles.clearButton}
+            >
+              <Icon name="close-circle" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       {/* Customer List */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1F49B6" />
           <Text style={styles.loadingText}>Loading customers...</Text>
         </View>
-      ) : customers.length === 0 ? (
+      ) : filteredCustomers.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Icon name="people-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>No customers found</Text>
-          <Text style={styles.emptySubText}>Tap the button below to add your first customer</Text>
+          <Text style={styles.emptyText}>
+            {searchQuery ? 'No customers found matching your search' : 'No customers found'}
+          </Text>
+          <Text style={styles.emptySubText}>
+            {searchQuery ? 'Try adjusting your search terms' : 'Tap the button below to add your first customer'}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={customers}
+          data={filteredCustomers}
           renderItem={renderCustomerItem}
           keyExtractor={(item) => item.id}
           style={styles.content}
@@ -476,6 +620,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 1 },
     shadowRadius: 2,
+    color: "#000000",
   },
   multilineInput: {
     height: 80,
@@ -572,6 +717,19 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#059669",
   },
+  loanTypeContainer: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E6EEFB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  loanTypeText: {
+    fontSize: 12,
+    color: '#1F49B6',
+    fontWeight: '600',
+  },
   addButton: {
     backgroundColor: "#1F49B6",
     flexDirection: "row",
@@ -625,6 +783,53 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: "#ccc",
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#f8f9fa",
+  },
+  searchInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+    paddingVertical: 0,
+  },
+  clearButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  editIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  editText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '600',
+    marginLeft: 4,
+    fontStyle: 'italic',
   },
 });
 

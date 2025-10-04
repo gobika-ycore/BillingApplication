@@ -25,6 +25,7 @@ const DashboardScreen = ({ navigation }) => {
     { id: 1, title: "Customer Data", route: "CustomerData", icon: "people-outline", color: "#E6EEFB" },
     { id: 2, title: "Sales Bill", route: "SalesBill", icon: "receipt-outline", color: "#E6EEFB" },
     { id: 3, title: "Collection Bill", route: "CollectionBill", icon: "card-outline", color: "#E6EEFB" },
+    { id: 4, title: "Loan Sales", route: "LoanSales", icon: "cash-outline", color: "#E6EEFB" },
   ];
 
   return (

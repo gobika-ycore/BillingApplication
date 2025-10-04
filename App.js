@@ -17,6 +17,8 @@ import CustomerDataScreen from "./screens/CustomerDataScreen";
 import SalesBillScreen from "./screens/SalesBillScreen";
 import CollectionBillScreen from "./screens/CollectionBillScreen";
 import LoanSalesScreen from "./screens/LoanSalesScreen";
+import AddLoanSaleScreen from "./screens/AddLoanSaleScreen";
+import LoanSaleDetailsScreen from "./screens/LoanSaleDetailsScreen";
 
 const Stack = createStackNavigator();
 
@@ -128,6 +130,8 @@ export default function App() {
             title: "Loan Sales"
           }}
         />
+        <Stack.Screen name="AddLoanSale" component={AddLoanSaleScreen} />
+        <Stack.Screen name="LoanSaleDetails" component={LoanSaleDetailsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
